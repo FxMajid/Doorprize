@@ -81,10 +81,7 @@ export const subscribeToConfig = (callback: (data: GameConfig) => void) => {
       callback(docSnap.data() as GameConfig);
     } else {
       // Initialize if doesn't exist
-      console.log("Creating default config...");
-      setDoc(docRef, DEFAULT_CONFIG).catch((err: any) => {
-        console.error("Failed to create default config. CHECK FIRESTORE RULES.", err.code, err.message);
-      });
+      // We rely on the transaction or manual save to create it to avoid permission issues with onSnapshot writers
       callback(DEFAULT_CONFIG);
     }
   }, (error: any) => {
@@ -126,6 +123,7 @@ export const subscribeToWinners = (callback: (data: any[]) => void) => {
 export const updateGameConfig = async (config: GameConfig) => {
   if (!db) return;
   const docRef = doc(db, CONFIG_COLLECTION, CONFIG_DOC_ID);
+  // Use set with merge: true to ensure document is created if it doesn't exist
   await setDoc(docRef, config, { merge: true });
 };
 
@@ -148,11 +146,13 @@ export const claimPrizeTransaction = async (
     const result = await runTransaction(db, async (transaction: any) => {
       // 1. Read Config
       const configSnap = await transaction.get(configRef);
-      if (!configSnap.exists()) {
-        throw new Error("Game config document not found. Ensure Firestore rules allow creation.");
+      
+      // FALLBACK: If config doesn't exist, use default empty config instead of crashing.
+      let currentConfig: GameConfig = DEFAULT_CONFIG;
+      if (configSnap.exists()) {
+        currentConfig = configSnap.data() as GameConfig;
       }
       
-      const currentConfig = configSnap.data() as GameConfig;
       let resultPrize: Prize | null = null;
       let newConfigData = { ...currentConfig };
 
@@ -220,7 +220,7 @@ export const claimPrizeTransaction = async (
           // --- EMPTY POOL ---
           resultPrize = {
             name: "Anda Kurang Beruntung",
-            description: "Stok hadiah telah habis.",
+            description: "Stok hadiah telah habis. (Hubungi Admin)",
             rarity: Rarity.CURSED,
             type: "ZONK",
             value: 0
@@ -230,14 +230,15 @@ export const claimPrizeTransaction = async (
 
       // 3. Write updates if prize found
       if (resultPrize) {
-        // Update Config (remove prize from pool)
-        transaction.update(configRef, {
+        // CRITICAL FIX: Use set() with merge: true instead of update()
+        // This ensures the document is created if it was missing previously.
+        transaction.set(configRef, {
           prizePoolText: newConfigData.prizePoolText,
-          targetedPrizesText: newConfigData.targetedPrizesText
-        });
+          targetedPrizesText: newConfigData.targetedPrizesText,
+          removeAfterWin: newConfigData.removeAfterWin ?? true
+        }, { merge: true });
 
         // Add Winner Log
-        // Note: We can't use addDoc inside transaction, we use set() on a new doc ref
         const newWinnerRef = doc(winnersRef); 
         transaction.set(newWinnerRef, {
           name: participantName,
@@ -256,12 +257,19 @@ export const claimPrizeTransaction = async (
     
     // Provide user-friendly error messages based on Firestore codes
     let msg = error.message || "Unknown transaction error";
-    if (error.code === 'permission-denied') {
-      msg = "Akses Ditolak: Cek 'Rules' di Firestore Console.";
+    
+    // Check specifically for "Database does not exist" error from screenshot
+    if (error.message && error.message.includes("database (default) does not exist")) {
+      msg = "SETUP REQUIRED: Database Firestore belum dibuat. Buka Firebase Console > Build > Firestore Database > Create Database.";
+    }
+    else if (error.code === 'permission-denied') {
+      msg = "Akses Ditolak: Cek 'Rules' di Firestore Console (pastikan allow read, write: if true).";
     } else if (error.code === 'unavailable') {
       msg = "Koneksi Terputus: Firestore offline atau tidak dapat dijangkau.";
-    } else if (error.code === 'not-found') {
-      msg = "Data Tidak Ditemukan: Konfigurasi game belum tersimpan.";
+    }
+    else if (error.code === 'not-found') {
+      // If we get here, it might be a weird edge case, but usually handled by the DB missing check above
+      msg = "Error Sistem: Dokumen konfigurasi tidak dapat dibaca.";
     }
 
     return { success: false, prize: null, message: msg };
