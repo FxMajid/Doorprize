@@ -338,26 +338,28 @@ const App: React.FC = () => {
 
         </div>
 
-        {/* --- Winners Feed (Footer) --- */}
-        <div className="w-full bg-slate-900/90 border-t border-slate-800 p-4">
-           <div className="max-w-4xl mx-auto">
-              <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-3">Recent Winners (Live Feed)</h3>
-              <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
-                 {winners.length === 0 ? (
-                    <span className="text-slate-600 text-sm italic">Belum ada pemenang. Ayo mulai!</span>
-                 ) : (
-                    winners.map((winner) => (
-                      <div key={winner.id} className="flex-shrink-0 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 flex flex-col min-w-[150px]">
-                         <span className="text-yellow-400 font-bold truncate">{winner.name}</span>
-                         <span className={`text-xs truncate ${winner.prize === "Anda Kurang Beruntung" ? "text-red-400" : "text-slate-300"}`}>
-                           {winner.prize}
-                         </span>
-                      </div>
-                    ))
-                 )}
-              </div>
-           </div>
-        </div>
+        {/* --- Winners Feed (Footer) - Only for Admin --- */}
+        {isAdmin && (
+          <div className="w-full bg-slate-900/90 border-t border-slate-800 p-4">
+             <div className="max-w-4xl mx-auto">
+                <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-3">Recent Winners (Live Feed)</h3>
+                <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+                   {winners.length === 0 ? (
+                      <span className="text-slate-600 text-sm italic">Belum ada pemenang. Ayo mulai!</span>
+                   ) : (
+                      winners.map((winner) => (
+                        <div key={winner.id} className="flex-shrink-0 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 flex flex-col min-w-[150px]">
+                           <span className="text-yellow-400 font-bold truncate">{winner.name}</span>
+                           <span className={`text-xs truncate ${winner.prize === "Anda Kurang Beruntung" ? "text-red-400" : "text-slate-300"}`}>
+                             {winner.prize}
+                           </span>
+                        </div>
+                      ))
+                   )}
+                </div>
+             </div>
+          </div>
+        )}
 
         {/* Prize Modal */}
         {modalOpen && (
