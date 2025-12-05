@@ -1,9 +1,9 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { Prize, Rarity } from "../types";
 
-const apiKey = process.env.API_KEY || '';
-
-const ai = new GoogleGenAI({ apiKey });
+// Initialize AI using process.env.API_KEY as per guidelines.
+// This assumes the environment variable is correctly configured and available.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const prizeSchema: Schema = {
   type: Type.OBJECT,
@@ -29,6 +29,19 @@ const prizeSchema: Schema = {
 };
 
 export const generateTreasure = async (): Promise<Prize> => {
+  // Check if API Key is effectively available (even though we initialized with it)
+  // This handles runtime cases where the key might be missing/undefined.
+  if (!process.env.API_KEY) {
+    console.error("API Key missing. Please ensure process.env.API_KEY is configured.");
+    return {
+        name: "Configuration Error",
+        description: "The magical conduit (API_KEY) is missing.",
+        rarity: Rarity.COMMON,
+        value: 0,
+        type: "Error"
+    };
+  }
+
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
