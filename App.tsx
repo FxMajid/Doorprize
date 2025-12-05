@@ -134,14 +134,16 @@ const App: React.FC = () => {
         setCurrentPrize(result.prize);
         playLootReveal(result.prize.rarity || Rarity.COMMON);
       } else {
-        // Fallback error (should rarely happen)
+        // Fallback error with specific message from backend
+        console.error("Prize claim failed:", result.message);
         setCurrentPrize({
-          name: "Connection Error",
-          description: "Gagal terhubung ke peti harta karun.",
-          rarity: Rarity.COMMON,
-          type: "Error",
+          name: "Database Error",
+          description: result.message || "Gagal terhubung ke peti harta karun.",
+          rarity: Rarity.CURSED,
+          type: "System Error",
           value: 0
         });
+        playLootReveal(Rarity.CURSED);
       }
       
     } catch (error) {

@@ -81,11 +81,14 @@ export const subscribeToConfig = (callback: (data: GameConfig) => void) => {
       callback(docSnap.data() as GameConfig);
     } else {
       // Initialize if doesn't exist
-      setDoc(docRef, DEFAULT_CONFIG).catch(console.error);
+      console.log("Creating default config...");
+      setDoc(docRef, DEFAULT_CONFIG).catch((err: any) => {
+        console.error("Failed to create default config. CHECK FIRESTORE RULES.", err.code, err.message);
+      });
       callback(DEFAULT_CONFIG);
     }
   }, (error: any) => {
-    console.error("Config listener error:", error);
+    console.error("Config listener error:", error.code, error.message);
   });
 
   return unsubscribe;
@@ -112,7 +115,7 @@ export const subscribeToWinners = (callback: (data: any[]) => void) => {
     }));
     callback(winners);
   }, (error: any) => {
-    console.error("Winners listener error:", error);
+    console.error("Winners listener error:", error.code, error.message);
   });
 
   return unsubscribe;
@@ -135,7 +138,7 @@ export const claimPrizeTransaction = async (
 ): Promise<{ success: boolean; prize: Prize | null; message?: string }> => {
   
   if (!db) {
-    return { success: false, prize: null, message: "Database not connected" };
+    return { success: false, prize: null, message: "Database not connected (Check API Key)" };
   }
 
   const configRef = doc(db, CONFIG_COLLECTION, CONFIG_DOC_ID);
@@ -146,7 +149,7 @@ export const claimPrizeTransaction = async (
       // 1. Read Config
       const configSnap = await transaction.get(configRef);
       if (!configSnap.exists()) {
-        throw new Error("Game config not found");
+        throw new Error("Game config document not found. Ensure Firestore rules allow creation.");
       }
       
       const currentConfig = configSnap.data() as GameConfig;
@@ -248,8 +251,19 @@ export const claimPrizeTransaction = async (
 
     return { success: true, prize: result };
 
-  } catch (error) {
-    console.error("Transaction failed: ", error);
-    return { success: false, prize: null, message: "Transaction failed or network error" };
+  } catch (error: any) {
+    console.error("Transaction failed detailed:", error);
+    
+    // Provide user-friendly error messages based on Firestore codes
+    let msg = error.message || "Unknown transaction error";
+    if (error.code === 'permission-denied') {
+      msg = "Akses Ditolak: Cek 'Rules' di Firestore Console.";
+    } else if (error.code === 'unavailable') {
+      msg = "Koneksi Terputus: Firestore offline atau tidak dapat dijangkau.";
+    } else if (error.code === 'not-found') {
+      msg = "Data Tidak Ditemukan: Konfigurasi game belum tersimpan.";
+    }
+
+    return { success: false, prize: null, message: msg };
   }
 };
