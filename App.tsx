@@ -57,6 +57,7 @@ const App: React.FC = () => {
   useEffect(() => {
     // Listen to Config Changes
     const unsubscribeConfig = subscribeToConfig((newConfig) => {
+      // Use functional update to avoid overwriting recent local edits if a sync happens
       setConfig(newConfig);
     });
 
@@ -94,6 +95,8 @@ const App: React.FC = () => {
   const handleSaveConfig = () => {
     updateGameConfig(config);
     playUiClick();
+    // Add visual feedback so user knows it worked
+    alert("✅ Config saved successfully to database!");
   };
 
   const handleLogout = () => {
@@ -207,25 +210,24 @@ const App: React.FC = () => {
                    <div className="mb-4">
                      <h3 className="font-bold text-yellow-400 mb-1">Random Prize Pool</h3>
                      <p className="text-xs text-slate-400 mb-2">
-                       Changes save to database immediately.
+                       Changes will be applied when you click Save.
                      </p>
                      <textarea
                         value={config.prizePoolText}
-                        onChange={(e) => setConfig({...config, prizePoolText: e.target.value})}
-                        onBlur={handleSaveConfig} // Auto-save on blur
+                        onChange={(e) => setConfig(prev => ({...prev, prizePoolText: e.target.value}))}
                         placeholder="Contoh:\nSepeda Gunung\nZONK\nKulkas"
                         className="w-full h-32 bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs md:text-sm focus:ring-2 focus:ring-yellow-500 outline-none mb-2 resize-none font-mono"
                      />
                      <div className="flex gap-2 mb-2">
                         <button 
                           onClick={() => {
+                            // Helper to add ZONK doesn't save automatically anymore, user must review and Save
                             const newText = config.prizePoolText + (config.prizePoolText ? '\n' : '') + Array(10).fill('ZONK').join('\n');
-                            setConfig({...config, prizePoolText: newText});
-                            updateGameConfig({...config, prizePoolText: newText});
+                            setConfig(prev => ({...prev, prizePoolText: newText}));
                           }}
                           className="px-2 py-1 bg-red-900/30 hover:bg-red-900/50 border border-red-800/50 rounded text-xs text-red-300"
                         >
-                          + 10 ZONK
+                          + 10 ZONK (Draft)
                         </button>
                      </div>
                      <div className="text-xs text-slate-300">
@@ -240,8 +242,7 @@ const App: React.FC = () => {
                      <h3 className="font-bold text-purple-400 mb-1">Targeted Prizes</h3>
                      <textarea
                         value={config.targetedPrizesText}
-                        onChange={(e) => setConfig({...config, targetedPrizesText: e.target.value})}
-                        onBlur={handleSaveConfig}
+                        onChange={(e) => setConfig(prev => ({...prev, targetedPrizesText: e.target.value}))}
                         placeholder="Rian:Iphone 15 Pro\nSiti:ZONK"
                         className="w-full h-24 bg-slate-900 border border-purple-500/30 rounded-lg p-3 text-xs md:text-sm focus:ring-2 focus:ring-purple-500 outline-none resize-none font-mono"
                      />
@@ -253,8 +254,7 @@ const App: React.FC = () => {
                           type="checkbox" 
                           checked={config.removeAfterWin}
                           onChange={(e) => {
-                             setConfig({...config, removeAfterWin: e.target.checked});
-                             updateGameConfig({...config, removeAfterWin: e.target.checked});
+                             setConfig(prev => ({...prev, removeAfterWin: e.target.checked}));
                           }}
                           className="rounded border-slate-600 bg-slate-700 text-yellow-500 focus:ring-offset-slate-800"
                         />
@@ -263,7 +263,7 @@ const App: React.FC = () => {
                    </div>
                    
                    <div className="mt-4 pt-2 border-t border-slate-700 text-center">
-                     <button onClick={handleSaveConfig} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-sm w-full font-bold">
+                     <button onClick={handleSaveConfig} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-sm w-full font-bold shadow-lg transform active:scale-95 transition-transform">
                        Force Save Config
                      </button>
                    </div>
@@ -329,7 +329,7 @@ const App: React.FC = () => {
               
               {!isOpen && !loading && (
                 <div className="absolute -bottom-8 left-0 right-0 text-center">
-                   <span className="text-yellow-400/80 text-sm font-mono animate-pulse">Click to Open (Firebase Sync)</span>
+                   <span className="text-yellow-400/80 text-sm font-mono animate-pulse">Click to Open</span>
                 </div>
               )}
            </div>

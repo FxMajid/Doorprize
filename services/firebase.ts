@@ -1,8 +1,21 @@
+// @ts-ignore: Firebase types might be missing or incompatible in this environment
+import { initializeApp, getApps, getApp } from "firebase/app";
+import * as _firestore from "firebase/firestore";
 import { Prize, Rarity } from "../types";
 
-// NOTE: Firebase module imports are causing compilation errors in this environment.
-// Switching to a local storage-based mock implementation to ensure the app functions correctly
-// without requiring the external Firebase SDK to be correctly resolved.
+// Workaround for Firebase v9+ import issues in some environments where types are not detected correctly
+const { 
+  getFirestore, 
+  doc, 
+  onSnapshot, 
+  setDoc, 
+  runTransaction, 
+  collection,
+  query,
+  orderBy,
+  limit,
+  serverTimestamp
+} = _firestore as any;
 
 // --- Interfaces ---
 export interface GameConfig {
@@ -11,175 +24,232 @@ export interface GameConfig {
   removeAfterWin: boolean;
 }
 
-// In-memory mock state with localStorage persistence
-const STORAGE_KEY_CONFIG = 'mock_game_config';
-const STORAGE_KEY_WINNERS = 'mock_game_winners';
+// --- Firebase Configuration ---
+// Uses Vite's import.meta.env for environment variables
+// Cast import.meta to any to avoid "Property 'env' does not exist on type 'ImportMeta'" error
+const env = (import.meta as any).env || {};
 
-const loadConfig = (): GameConfig => {
-  try {
-    if (typeof localStorage !== 'undefined') {
-      const stored = localStorage.getItem(STORAGE_KEY_CONFIG);
-      if (stored) return JSON.parse(stored);
-    }
-  } catch (e) {
-    console.warn("LocalStorage access failed", e);
-  }
-  return {
-    prizePoolText: "",
-    targetedPrizesText: "",
-    removeAfterWin: true
-  };
+const firebaseConfig = {
+  apiKey: env.VITE_FIREBASE_API_KEY,
+  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: env.VITE_FIREBASE_APP_ID
 };
 
-const loadWinners = (): any[] => {
-  try {
-    if (typeof localStorage !== 'undefined') {
-      const stored = localStorage.getItem(STORAGE_KEY_WINNERS);
-      if (stored) return JSON.parse(stored);
-    }
-  } catch (e) {
-    console.warn("LocalStorage access failed", e);
+// Initialize Firebase
+let db: any = null;
+
+try {
+  // Check if initializeApp is actually a function (runtime check)
+  if (firebaseConfig.apiKey && typeof initializeApp === 'function') {
+    const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    db = getFirestore(app);
+    console.log("🔥 Firebase Initialized");
+  } else {
+    console.warn("⚠️ Firebase Config Missing or SDK not loaded. Please check your .env file and dependencies.");
   }
-  return [];
+} catch (error) {
+  console.error("❌ Firebase Init Failed:", error);
+}
+
+// Database References
+const CONFIG_DOC_ID = "main";
+const CONFIG_COLLECTION = "game_config"; // doc: main
+const WINNERS_COLLECTION = "winners";
+
+// Default Config
+const DEFAULT_CONFIG: GameConfig = {
+  prizePoolText: "",
+  targetedPrizesText: "",
+  removeAfterWin: true
 };
-
-let configState: GameConfig = loadConfig();
-let winnersState: any[] = loadWinners();
-
-const configListeners = new Set<(data: GameConfig) => void>();
-const winnersListeners = new Set<(data: any[]) => void>();
-
-const notifyConfig = () => configListeners.forEach(cb => cb({ ...configState }));
-const notifyWinners = () => winnersListeners.forEach(cb => cb([...winnersState]));
 
 // --- Listeners ---
 
 export const subscribeToConfig = (callback: (data: GameConfig) => void) => {
-  configListeners.add(callback);
-  // Send current state immediately
-  callback({ ...configState });
-  return () => configListeners.delete(callback);
+  if (!db) {
+    callback(DEFAULT_CONFIG);
+    return () => {};
+  }
+
+  const docRef = doc(db, CONFIG_COLLECTION, CONFIG_DOC_ID);
+  
+  const unsubscribe = onSnapshot(docRef, (docSnap: any) => {
+    if (docSnap.exists()) {
+      callback(docSnap.data() as GameConfig);
+    } else {
+      // Initialize if doesn't exist
+      setDoc(docRef, DEFAULT_CONFIG).catch(console.error);
+      callback(DEFAULT_CONFIG);
+    }
+  }, (error: any) => {
+    console.error("Config listener error:", error);
+  });
+
+  return unsubscribe;
 };
 
 export const subscribeToWinners = (callback: (data: any[]) => void) => {
-  winnersListeners.add(callback);
-  // Send current state immediately
-  callback([...winnersState]);
-  return () => winnersListeners.delete(callback);
+  if (!db) {
+    callback([]);
+    return () => {};
+  }
+
+  const q = query(
+    collection(db, WINNERS_COLLECTION),
+    orderBy("timestamp", "desc"),
+    limit(50)
+  );
+
+  const unsubscribe = onSnapshot(q, (snapshot: any) => {
+    const winners = snapshot.docs.map((doc: any) => ({
+      id: doc.id,
+      ...doc.data(),
+      // Convert Timestamp to millis for frontend compatibility
+      timestamp: doc.data().timestamp?.toMillis() || Date.now()
+    }));
+    callback(winners);
+  }, (error: any) => {
+    console.error("Winners listener error:", error);
+  });
+
+  return unsubscribe;
 };
 
 // --- Actions ---
 
 export const updateGameConfig = async (config: GameConfig) => {
-  configState = { ...config };
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify(configState));
-  }
-  notifyConfig();
+  if (!db) return;
+  const docRef = doc(db, CONFIG_COLLECTION, CONFIG_DOC_ID);
+  await setDoc(docRef, config, { merge: true });
 };
 
+/**
+ * Executes the prize draw logic atomically inside a Transaction.
+ * This prevents race conditions (e.g., two people winning the same unique item).
+ */
 export const claimPrizeTransaction = async (
   participantName: string
 ): Promise<{ success: boolean; prize: Prize | null; message?: string }> => {
   
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 600));
+  if (!db) {
+    return { success: false, prize: null, message: "Database not connected" };
+  }
 
-  let resultPrize: Prize | null = null;
-  // Clone current config to simulate transactional read
-  const currentConfig = { ...configState };
+  const configRef = doc(db, CONFIG_COLLECTION, CONFIG_DOC_ID);
+  const winnersRef = collection(db, WINNERS_COLLECTION);
 
-  // 1. Check Targeted Prizes
-  const targetedLines = (currentConfig.targetedPrizesText || "").split('\n').filter(l => l.trim() !== '');
-  let targetedMatchIndex = -1;
-  let targetedPrizeName = "";
-
-  for (let i = 0; i < targetedLines.length; i++) {
-    const line = targetedLines[i];
-    const separatorIndex = line.indexOf(':');
-    if (separatorIndex > -1) {
-      const targetName = line.substring(0, separatorIndex).trim().toLowerCase();
-      const targetReward = line.substring(separatorIndex + 1).trim();
+  try {
+    const result = await runTransaction(db, async (transaction: any) => {
+      // 1. Read Config
+      const configSnap = await transaction.get(configRef);
+      if (!configSnap.exists()) {
+        throw new Error("Game config not found");
+      }
       
-      if (targetName === participantName.trim().toLowerCase()) {
-        targetedMatchIndex = i;
-        targetedPrizeName = targetReward;
-        break;
+      const currentConfig = configSnap.data() as GameConfig;
+      let resultPrize: Prize | null = null;
+      let newConfigData = { ...currentConfig };
+
+      // 2. Determine Prize Logic (Server-side simulation inside transaction)
+      
+      // A. Check Targeted Prizes
+      const targetedLines = (currentConfig.targetedPrizesText || "").split('\n').filter(l => l.trim() !== '');
+      let targetedMatchIndex = -1;
+      let targetedPrizeName = "";
+
+      for (let i = 0; i < targetedLines.length; i++) {
+        const line = targetedLines[i];
+        const separatorIndex = line.indexOf(':');
+        if (separatorIndex > -1) {
+          const targetName = line.substring(0, separatorIndex).trim().toLowerCase();
+          const targetReward = line.substring(separatorIndex + 1).trim();
+          
+          if (targetName === participantName.trim().toLowerCase()) {
+            targetedMatchIndex = i;
+            targetedPrizeName = targetReward;
+            break;
+          }
+        }
       }
-    }
-  }
 
-  if (targetedMatchIndex > -1 && targetedPrizeName) {
-    // --- TARGETED WIN ---
-    const isZonk = targetedPrizeName.toUpperCase().includes("ZONK");
-    resultPrize = {
-      name: isZonk ? "Anda Kurang Beruntung" : targetedPrizeName,
-      description: isZonk ? "Mohon maaf, tetap semangat!" : "Hadiah ini khusus dipilihkan semesta untukmu!",
-      rarity: isZonk ? Rarity.CURSED : Rarity.LEGENDARY,
-      type: isZonk ? "ZONK" : "Special Reward",
-      value: isZonk ? 0 : 9999
-    };
+      if (targetedMatchIndex > -1 && targetedPrizeName) {
+        // --- TARGETED WIN ---
+        const isZonk = targetedPrizeName.toUpperCase().includes("ZONK");
+        resultPrize = {
+          name: isZonk ? "Anda Kurang Beruntung" : targetedPrizeName,
+          description: isZonk ? "Mohon maaf, tetap semangat!" : "Hadiah ini khusus dipilihkan semesta untukmu!",
+          rarity: isZonk ? Rarity.CURSED : Rarity.LEGENDARY,
+          type: isZonk ? "ZONK" : "Special Reward",
+          value: isZonk ? 0 : 9999
+        };
 
-    if (currentConfig.removeAfterWin) {
-      targetedLines.splice(targetedMatchIndex, 1);
-      currentConfig.targetedPrizesText = targetedLines.join('\n');
-    }
-  } else {
-    // --- RANDOM POOL LOGIC ---
-    const availablePrizes = (currentConfig.prizePoolText || "").split('\n').filter(line => line.trim() !== '');
+        if (currentConfig.removeAfterWin) {
+          targetedLines.splice(targetedMatchIndex, 1);
+          newConfigData.targetedPrizesText = targetedLines.join('\n');
+        }
+      } else {
+        // --- RANDOM POOL LOGIC ---
+        const availablePrizes = (currentConfig.prizePoolText || "").split('\n').filter(line => line.trim() !== '');
 
-    if (availablePrizes.length > 0) {
-      const randomIndex = Math.floor(Math.random() * availablePrizes.length);
-      const rawPrizeName = availablePrizes[randomIndex].trim();
-      const isZonk = rawPrizeName.toUpperCase() === "ZONK";
+        if (availablePrizes.length > 0) {
+          const randomIndex = Math.floor(Math.random() * availablePrizes.length);
+          const rawPrizeName = availablePrizes[randomIndex].trim();
+          const isZonk = rawPrizeName.toUpperCase() === "ZONK";
 
-      resultPrize = {
-        name: isZonk ? "Anda Kurang Beruntung" : rawPrizeName,
-        description: isZonk 
-          ? "Mohon maaf, hadiah utama telah habis. Tetap semangat!"
-          : "Selamat! Anda mendapatkan hadiah spesial.",
-        rarity: isZonk ? Rarity.CURSED : Rarity.EPIC,
-        type: isZonk ? "ZONK" : "Reward",
-        value: isZonk ? 0 : 100
-      };
+          resultPrize = {
+            name: isZonk ? "Anda Kurang Beruntung" : rawPrizeName,
+            description: isZonk 
+              ? "Mohon maaf, hadiah utama telah habis. Tetap semangat!"
+              : "Selamat! Anda mendapatkan hadiah spesial.",
+            rarity: isZonk ? Rarity.CURSED : Rarity.EPIC,
+            type: isZonk ? "ZONK" : "Reward",
+            value: isZonk ? 0 : 100
+          };
 
-      if (currentConfig.removeAfterWin) {
-        availablePrizes.splice(randomIndex, 1);
-        currentConfig.prizePoolText = availablePrizes.join('\n');
+          if (currentConfig.removeAfterWin) {
+            availablePrizes.splice(randomIndex, 1);
+            newConfigData.prizePoolText = availablePrizes.join('\n');
+          }
+        } else {
+          // --- EMPTY POOL ---
+          resultPrize = {
+            name: "Anda Kurang Beruntung",
+            description: "Stok hadiah telah habis.",
+            rarity: Rarity.CURSED,
+            type: "ZONK",
+            value: 0
+          };
+        }
       }
-    } else {
-      // --- EMPTY POOL ---
-      resultPrize = {
-        name: "Anda Kurang Beruntung",
-        description: "Stok hadiah telah habis.",
-        rarity: Rarity.CURSED,
-        type: "ZONK",
-        value: 0
-      };
-    }
-  }
 
-  if (resultPrize) {
-    // Commit Transaction (Update Config)
-    await updateGameConfig(currentConfig);
+      // 3. Write updates if prize found
+      if (resultPrize) {
+        // Update Config (remove prize from pool)
+        transaction.update(configRef, {
+          prizePoolText: newConfigData.prizePoolText,
+          targetedPrizesText: newConfigData.targetedPrizesText
+        });
 
-    // Add winner
-    const newWinner = {
-      id: Date.now().toString(),
-      name: participantName,
-      prize: resultPrize.name,
-      timestamp: Date.now()
-    };
-    
-    // Add to top
-    winnersState = [newWinner, ...winnersState];
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY_WINNERS, JSON.stringify(winnersState));
-    }
-    notifyWinners();
+        // Add Winner Log
+        // Note: We can't use addDoc inside transaction, we use set() on a new doc ref
+        const newWinnerRef = doc(winnersRef); 
+        transaction.set(newWinnerRef, {
+          name: participantName,
+          prize: resultPrize.name,
+          timestamp: serverTimestamp()
+        });
+      }
 
-    return { success: true, prize: resultPrize };
-  } else {
-     return { success: false, prize: null, message: "Transaction failed" };
+      return resultPrize;
+    });
+
+    return { success: true, prize: result };
+
+  } catch (error) {
+    console.error("Transaction failed: ", error);
+    return { success: false, prize: null, message: "Transaction failed or network error" };
   }
 };
