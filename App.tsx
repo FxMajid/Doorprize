@@ -14,6 +14,7 @@ import {
   subscribeToWinners, 
   updateGameConfig, 
   claimPrizeTransaction,
+  clearAllWinners,
   GameConfig
 } from './services/firebase';
 import { Prize, Rarity } from './types';
@@ -103,6 +104,18 @@ const App: React.FC = () => {
     setIsAdmin(false);
     setShowSettings(false);
     playUiClose();
+  };
+
+  const handleClearWinners = async () => {
+    if (window.confirm("Yakin ingin menghapus SEMUA riwayat pemenang? Data tidak bisa dikembalikan.")) {
+        try {
+            await clearAllWinners();
+            alert("Riwayat berhasil dihapus.");
+        } catch (error) {
+            console.error(error);
+            alert("Gagal menghapus data.");
+        }
+    }
   };
 
   const handleChestClick = async () => {
@@ -342,7 +355,15 @@ const App: React.FC = () => {
         {isAdmin && (
           <div className="w-full bg-slate-900/90 border-t border-slate-800 p-4">
              <div className="max-w-4xl mx-auto">
-                <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-3">Recent Winners (Live Feed)</h3>
+                <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider">Recent Winners (Live Feed)</h3>
+                    <button 
+                       onClick={handleClearWinners}
+                       className="text-xs text-red-500 hover:text-red-400 hover:underline px-2 py-1 rounded hover:bg-red-900/20 transition-all"
+                    >
+                       Clear History
+                    </button>
+                </div>
                 <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
                    {winners.length === 0 ? (
                       <span className="text-slate-600 text-sm italic">Belum ada pemenang. Ayo mulai!</span>

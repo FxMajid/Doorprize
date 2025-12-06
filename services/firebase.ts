@@ -14,7 +14,9 @@ const {
   query,
   orderBy,
   limit,
-  serverTimestamp
+  serverTimestamp,
+  getDocs,
+  writeBatch
 } = _firestore as any;
 
 // --- Interfaces ---
@@ -273,5 +275,29 @@ export const claimPrizeTransaction = async (
     }
 
     return { success: false, prize: null, message: msg };
+  }
+};
+
+export const clearAllWinners = async () => {
+  if (!db) return;
+  try {
+    const winnersRef = collection(db, WINNERS_COLLECTION);
+    const snapshot = await getDocs(winnersRef);
+    
+    // Batch delete (max 500 per batch)
+    const BATCH_SIZE = 400;
+    const batches = [];
+    
+    for (let i = 0; i < snapshot.docs.length; i += BATCH_SIZE) {
+      const batch = writeBatch(db);
+      const chunk = snapshot.docs.slice(i, i + BATCH_SIZE);
+      chunk.forEach((doc: any) => batch.delete(doc.ref));
+      batches.push(batch.commit());
+    }
+
+    await Promise.all(batches);
+  } catch (error) {
+    console.error("Failed to clear winners:", error);
+    throw error;
   }
 };
