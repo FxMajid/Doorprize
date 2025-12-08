@@ -134,7 +134,8 @@ export const updateGameConfig = async (config: GameConfig) => {
  * This prevents race conditions (e.g., two people winning the same unique item).
  */
 export const claimPrizeTransaction = async (
-  participantName: string
+  nik: string,
+  employeeName: string
 ): Promise<{ success: boolean; prize: Prize | null; message?: string }> => {
   
   if (!db) {
@@ -169,10 +170,11 @@ export const claimPrizeTransaction = async (
         const line = targetedLines[i];
         const separatorIndex = line.indexOf(':');
         if (separatorIndex > -1) {
-          const targetName = line.substring(0, separatorIndex).trim().toLowerCase();
+          const targetKey = line.substring(0, separatorIndex).trim().toLowerCase();
           const targetReward = line.substring(separatorIndex + 1).trim();
           
-          if (targetName === participantName.trim().toLowerCase()) {
+          // Check if target key matches NIK OR matches the Name
+          if (targetKey === nik.trim().toLowerCase() || targetKey === employeeName.trim().toLowerCase()) {
             targetedMatchIndex = i;
             targetedPrizeName = targetReward;
             break;
@@ -243,7 +245,8 @@ export const claimPrizeTransaction = async (
         // Add Winner Log
         const newWinnerRef = doc(winnersRef); 
         transaction.set(newWinnerRef, {
-          name: participantName,
+          nik: nik,
+          name: employeeName,
           prize: resultPrize.name,
           timestamp: serverTimestamp()
         });

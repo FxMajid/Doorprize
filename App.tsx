@@ -22,6 +22,7 @@ import { Prize, Rarity } from './types';
 interface Winner {
   id: string;
   name: string;
+  nik?: string;
   prize: string;
   timestamp: number;
 }
@@ -34,7 +35,8 @@ const App: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
   
   // Input State
-  const [participantName, setParticipantName] = useState("");
+  const [nik, setNik] = useState("");
+  const [employeeName, setEmployeeName] = useState("");
   
   // Synced State (from Firebase)
   const [config, setConfig] = useState<GameConfig>({
@@ -52,6 +54,7 @@ const App: React.FC = () => {
   const [isMuted, setIsMuted] = useState(getMuted());
 
   // Refs
+  const nikInputRef = useRef<HTMLInputElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   // --- Initial Subscription ---
@@ -121,7 +124,17 @@ const App: React.FC = () => {
   const handleChestClick = async () => {
     if (isOpen || loading) return;
 
-    if (!participantName.trim()) {
+    // Validate NIK
+    if (!nik.trim()) {
+      playUiClose();
+      nikInputRef.current?.focus();
+      nikInputRef.current?.classList.add('animate-pulse', 'border-red-500');
+      setTimeout(() => nikInputRef.current?.classList.remove('animate-pulse', 'border-red-500'), 1000);
+      return;
+    }
+
+    // Validate Name
+    if (!employeeName.trim()) {
       playUiClose();
       nameInputRef.current?.focus();
       nameInputRef.current?.classList.add('animate-pulse', 'border-red-500');
@@ -141,7 +154,7 @@ const App: React.FC = () => {
 
       // 2. CALL FIREBASE TRANSACTION
       // This runs on the server/database rules to ensure uniqueness
-      const result = await claimPrizeTransaction(participantName);
+      const result = await claimPrizeTransaction(nik, employeeName);
 
       if (result.success && result.prize) {
         setCurrentPrize(result.prize);
@@ -173,7 +186,8 @@ const App: React.FC = () => {
     setModalOpen(false);
     setCurrentPrize(null);
     setIsOpen(false);
-    setParticipantName("");
+    setNik("");
+    setEmployeeName("");
   };
 
   const availablePrizesCount = (config.prizePoolText || "").split('\n').filter(l => l.trim() !== '').length;
@@ -255,10 +269,11 @@ const App: React.FC = () => {
                    {/* Targeted Prize Section */}
                    <div className="mb-3">
                      <h3 className="font-bold text-purple-400 mb-1">Targeted Prizes</h3>
+                     <p className="text-[10px] text-slate-400 mb-1">Gunakan NIK atau Nama Karyawan.</p>
                      <textarea
                         value={config.targetedPrizesText}
                         onChange={(e) => setConfig(prev => ({...prev, targetedPrizesText: e.target.value}))}
-                        placeholder="Rian:Iphone 15 Pro\nSiti:ZONK"
+                        placeholder="12345:Iphone 15 Pro\nBudi Santoso:ZONK"
                         className="w-full h-24 bg-slate-900 border border-purple-500/30 rounded-lg p-3 text-xs md:text-sm focus:ring-2 focus:ring-purple-500 outline-none resize-none font-mono"
                      />
                    </div>
@@ -313,22 +328,39 @@ const App: React.FC = () => {
            </h1>
 
            {/* Input Section */}
-           <div className="w-full max-w-md mb-8 relative z-10">
-              <label className="block text-slate-400 text-sm font-bold mb-2 ml-1 uppercase tracking-wider">
-                Participant Name
-              </label>
-              <input
-                ref={nameInputRef}
-                type="text"
-                value={participantName}
-                onChange={(e) => setParticipantName(e.target.value)}
-                placeholder="Enter lucky person's name..."
-                disabled={isOpen || loading}
-                className="w-full bg-slate-800/80 backdrop-blur border-2 border-slate-600 focus:border-yellow-500 rounded-xl px-6 py-4 text-xl md:text-2xl text-center text-white placeholder-slate-500 outline-none transition-all shadow-lg"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleChestClick();
-                }}
-              />
+           <div className="w-full max-w-md mb-8 relative z-10 space-y-4">
+              <div className="group">
+                  <label className="block text-slate-400 text-xs font-bold mb-1 ml-1 uppercase tracking-wider group-focus-within:text-yellow-500 transition-colors">
+                    Nomor Induk Karyawan
+                  </label>
+                  <input
+                    ref={nikInputRef}
+                    type="text"
+                    value={nik}
+                    onChange={(e) => setNik(e.target.value)}
+                    placeholder="NIK"
+                    disabled={isOpen || loading}
+                    className="w-full bg-slate-800/80 backdrop-blur border-2 border-slate-600 focus:border-yellow-500 rounded-xl px-4 py-3 text-lg text-center text-white placeholder-slate-500 outline-none transition-all shadow-lg"
+                  />
+              </div>
+
+              <div className="group">
+                  <label className="block text-slate-400 text-xs font-bold mb-1 ml-1 uppercase tracking-wider group-focus-within:text-yellow-500 transition-colors">
+                    Nama Karyawan
+                  </label>
+                  <input
+                    ref={nameInputRef}
+                    type="text"
+                    value={employeeName}
+                    onChange={(e) => setEmployeeName(e.target.value)}
+                    placeholder="Nama Lengkap"
+                    disabled={isOpen || loading}
+                    className="w-full bg-slate-800/80 backdrop-blur border-2 border-slate-600 focus:border-yellow-500 rounded-xl px-4 py-3 text-xl font-bold text-center text-white placeholder-slate-500 outline-none transition-all shadow-lg"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleChestClick();
+                    }}
+                  />
+              </div>
            </div>
 
            {/* The Chest */}
@@ -371,6 +403,7 @@ const App: React.FC = () => {
                       winners.map((winner) => (
                         <div key={winner.id} className="flex-shrink-0 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 flex flex-col min-w-[150px]">
                            <span className="text-yellow-400 font-bold truncate">{winner.name}</span>
+                           {winner.nik && <span className="text-xs text-slate-500 truncate">{winner.nik}</span>}
                            <span className={`text-xs truncate ${winner.prize === "Anda Kurang Beruntung" ? "text-red-400" : "text-slate-300"}`}>
                              {winner.prize}
                            </span>
@@ -386,7 +419,7 @@ const App: React.FC = () => {
         {modalOpen && (
           <PrizeModal 
             prize={currentPrize} 
-            winnerName={participantName}
+            winnerName={`${employeeName} (${nik})`}
             onClose={handleCloseModal} 
             loading={loading}
           />
