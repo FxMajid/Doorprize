@@ -81,7 +81,7 @@ const App: React.FC = () => {
 
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwordInput === "admin") {
+    if (passwordInput === "majid") {
       setIsAdmin(true);
       setShowAdminLogin(false);
       setShowSettings(true);
