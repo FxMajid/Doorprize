@@ -179,10 +179,10 @@ const App: React.FC = () => {
   const availablePrizesCount = (config.prizePoolText || "").split('\n').filter(l => l.trim() !== '').length;
 
   return (
-    <div className="min-h-screen bg-[url('https://picsum.photos/seed/dark-texture/1920/1080')] bg-cover bg-center bg-fixed bg-no-repeat bg-blend-multiply bg-slate-900 overflow-x-hidden text-slate-100 font-sans selection:bg-yellow-500/30">
+    <div className="min-h-screen bg-[url('https://lh3.googleusercontent.com/rd-gg/AIJ2gl8CkJCuHlq1lzrnVLilLEELQaZo2aIo5G2U6oKorgZjgK8sFbkXVgrMFmEefD44GGYMnHBrKfBXOBUyfoxrRLe81dVgg-8uj7GPhATr8FUxs23hwNgwgvDpStA_017LEb_PJX0FSnPwEN2gaoyVP7XuVKwjF7k2p4bAixMk-u3ogUmzGVgBW4YzhayiJTYSV68r6kqVJ64YWPn1suviAuutGCeENyX6TyPNeuTeVMvVs3QAFVwghBmeDhguDXr60A3sEU88d1TA98kBvILYyaLo5KvcTwTBde4zArH_M0iEu5L0_gvrAcF3ebz3B6irtuFdguebxmSRPFSm2YRbXkHLKNBamTfQkgeA959UePYbp90wkdRT1I7F-B3mLLud08Bllr-mDPN4jR2aMdw-DlAEARXzLMC5UA8EEZY8QXfBTx2uQILy6mnkOc-vvSu2BZcWlT6Z7dvXbRu-QemPlQp_D1BkRCjLYzKAz8zXPUB-Ofs8oSKaqPPQxIql0bV-dYA1Wkk16EavyQQgacFENk-ygvJd-dJGWvVub9XNBLN9h48xgUM7VsJoMKXdmOmVqccphGDr9wFNTJZf3GKxcVAvk5fImLIrq_lcVHHZhqJ_iDTj-E-5IAIKrKr2yWw8X-7YF2zBXjlJqelUlYAs5Wm0RatFYr6b9iHpCqXV4Kcsc33hOtJdYtMBaWCKR9fvVvI-kgil08b-RLHKTQQue4A86IK9Iq3UUi686TG2XncXW4jSW4Dq01gVTX4iiVTrIQQ97u2Y8t2YMzj8LQypQpXxrlvU0hpny3nrUnTS7TpQGrF8YcKb-h4kmSNDi-sGNSsvRuvvIYwD_gd_resefZVuD_enHa6jnFnWtA12w1TO_p_K9rdyJyI5h8-_Fp2lYkKlRLYwjhTRXvfgXDjLiSEhwzbnzIq8dzgjoHjWhVu-fEGh06eOKwmQ6FDJmChyh9-82e90GZKLwcjdHvr7RL_AHY3pb_HtuKVMSSP9s1exGWXU2HeC2lqZRAOBk5tZuZJeQhH9ylvqNO1Zuvq7q5QmGQ_GI5wCWI62fuXtT7vnxlIKgkN6PpZSc3AJkJHZI8U_pfSLVh4guuSH8iDML4-cszWwOSVrmSVXI9EQw2gQ5tjS5ga7mPHl1UVGPwxrWcenYy1JaS5qI-nN8X7_OQglvYfLDio5tpfc_UzbQkmX2eZ2i6LgOnW_VnBE89CxT7mkNjWM1y2tSqx_tQhzzQA42nn4ulOSOtWCvAUdHPW4HseLlBycKYfT28y0OJ3eb2VeLN-tUUTmgT2oaHEL9-YKO0BC_H3SABcMEk0dX_XU41XE21GX785kf6QmsYBItwuEXLwQ_C4BkANDq9zNl7FyuNAjksvSLZiw_daZAxePAtc1Ns3vGgmabsc=s1024-rj-mp2')] bg-cover bg-center bg-fixed bg-no-repeat overflow-x-hidden text-slate-100 font-sans selection:bg-yellow-500/30">
       
       {/* --- Overlay --- */}
-      <div className="min-h-screen bg-gradient-to-b from-slate-900/90 via-slate-900/80 to-slate-900/95 flex flex-col">
+      <div className="min-h-screen flex flex-col">
         
         {/* --- Header / Settings Bar --- */}
         <div className="w-full p-4 flex justify-between items-start z-40 relative">
