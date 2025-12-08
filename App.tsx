@@ -179,7 +179,7 @@ const App: React.FC = () => {
   const availablePrizesCount = (config.prizePoolText || "").split('\n').filter(l => l.trim() !== '').length;
 
   return (
-    <div className="min-h-screen bg-[url('https://pbs.twimg.com/media/G7nRFo4bcAAWrLC?format=jpg&name=medium')] bg-cover bg-center bg-fixed bg-no-repeat overflow-x-hidden text-slate-100 font-sans selection:bg-yellow-500/30">
+    <div className="min-h-screen bg-[url('https://pbs.twimg.com/media/G7nW9UvasAA4QcD?format=jpg&name=medium')] bg-cover bg-center bg-fixed bg-no-repeat overflow-x-hidden text-slate-100 font-sans selection:bg-yellow-500/30">
       
       {/* --- Overlay --- */}
       <div className="min-h-screen flex flex-col">
@@ -308,7 +308,7 @@ const App: React.FC = () => {
         {/* --- Main Game Area --- */}
         <div className="flex-1 flex flex-col items-center justify-center p-4 -mt-10">
            
-           <h1 className="text-5xl md:text-7xl font-serif font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-amber-200 to-yellow-500 drop-shadow-lg tracking-wider mb-8 text-center">
+           <h1 className="text-5xl md:text-7xl font-serif font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-amber-200 to-yellow-500 drop-shadow-lg tracking-wider mb-8 pt-24 text-center">
               Treasure Draw
            </h1>
 
